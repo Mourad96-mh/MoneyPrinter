@@ -329,11 +329,6 @@ def send_whatsapp_message(driver, phone: str, message: str) -> bool:
             except Exception:
                 pass
 
-        # Check for invalid phone error
-        if driver.find_elements(By.XPATH, "//*[contains(text(),'numéro de téléphone') or contains(text(),'phone number') or contains(text(),'invalid')]"):
-            print(f"[WA ERROR] Invalid/not on WhatsApp: {phone}")
-            return False
-
         # Wait for send button — try multiple selectors
         send_btn = None
         for sel in [
