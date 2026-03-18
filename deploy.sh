@@ -31,9 +31,9 @@ if [ -d "$INSTALL_DIR" ]; then
   echo "  Directory exists — pulling latest changes..."
   cd "$INSTALL_DIR" && git pull
 else
-  echo "  Cloning repo — EDIT THIS LINE with your actual repo URL"
-  # git clone https://github.com/YOUR_USERNAME/MoneyPrinter.git "$INSTALL_DIR"
-  echo "  [!] Skipped clone — upload your files manually via scp or git"
+  echo "  Cloning repo..."
+  git clone https://github.com/Mourad96-mh/MoneyPrinter.git "$INSTALL_DIR"
+  echo "  [!] Skipped clone — run: git clone https://github.com/Mourad96-mh/MoneyPrinter.git $INSTALL_DIR"
 fi
 
 # 4. Config check
