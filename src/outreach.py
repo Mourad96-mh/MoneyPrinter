@@ -163,6 +163,9 @@ def get_driver():
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--window-size=1920,1080")
     options.add_argument("--lang=fr-MA")
+    options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-extensions")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
     driver = webdriver.Chrome(
@@ -191,14 +194,14 @@ def scrape_google_maps(query: str, max_results: int = 20) -> list:
     try:
         url = f"https://www.google.com/maps/search/{quote(query)}"
         driver.get(url)
-        time.sleep(3)
+        time.sleep(5)
 
         accept_cookies(driver)
-        time.sleep(1)
+        time.sleep(2)
 
         # Scroll the results panel to load more listings
         try:
-            feed = WebDriverWait(driver, 10).until(
+            feed = WebDriverWait(driver, 15).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, 'div[role="feed"]'))
             )
             for _ in range(5):
