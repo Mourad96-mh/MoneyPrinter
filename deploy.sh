@@ -1,5 +1,5 @@
 #!/bin/bash
-# deploy.sh — Run this ONCE on a fresh Ubuntu 22.04 VPS
+# deploy.sh — Run this ONCE on a fresh Ubuntu 22.04/24.04 VPS
 # Usage: bash deploy.sh
 # Then edit config.json with your Gmail credentials
 
@@ -12,7 +12,7 @@ echo "============================================"
 # 1. System update + Chrome
 echo "[1/5] Installing system dependencies..."
 apt-get update -qq
-apt-get install -y -qq python3 python3-pip git wget gnupg unzip curl
+apt-get install -y -qq python3 python3-pip git wget gnupg unzip curl xvfb
 
 echo "[2/5] Installing Google Chrome..."
 wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
@@ -21,7 +21,7 @@ rm google-chrome-stable_current_amd64.deb
 
 # 2. Python dependencies
 echo "[3/5] Installing Python packages..."
-pip3 install -q yagmail requests selenium webdriver-manager pywhatkit premailer
+pip3 install -q --break-system-packages yagmail requests selenium webdriver-manager premailer
 
 # 3. Project setup
 echo "[4/5] Setting up project..."
@@ -33,7 +33,6 @@ if [ -d "$INSTALL_DIR" ]; then
 else
   echo "  Cloning repo..."
   git clone https://github.com/Mourad96-mh/MoneyPrinter.git "$INSTALL_DIR"
-  echo "  [!] Skipped clone — run: git clone https://github.com/Mourad96-mh/MoneyPrinter.git $INSTALL_DIR"
 fi
 
 # 4. Config check
@@ -54,9 +53,9 @@ echo "============================================"
 echo "  Setup complete!"
 echo ""
 echo "  Next steps:"
-echo "  1. Upload your project files to $INSTALL_DIR"
-echo "  2. Edit config.json:  nano $INSTALL_DIR/config.json"
-echo "  3. Test it:           python3 $INSTALL_DIR/run.py --pilot"
+echo "  1. Edit config.json:      nano $INSTALL_DIR/config.json"
+echo "  2. Setup WhatsApp (once): python3 $INSTALL_DIR/setup_whatsapp.py"
+echo "  3. Test it:               python3 $INSTALL_DIR/run.py --pilot"
 echo "  4. It will auto-run every night at 3:00 AM"
 echo ""
 echo "  View logs:  tail -f $INSTALL_DIR/logs/cron.log"

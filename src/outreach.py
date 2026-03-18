@@ -4,9 +4,9 @@ import sys
 import csv
 import json
 import time
+import subprocess
 import yagmail
 import requests
-import pywhatkit
 from datetime import datetime
 from urllib.parse import quote
 
@@ -101,6 +101,58 @@ def normalize_phone(raw: str) -> str:
     if digits.startswith("0") and len(digits) == 10:
         return "+212" + digits[1:]
     return digits
+
+
+_WHATSAPP_PROFILE = os.path.expanduser("~/.config/chrome-whatsapp")
+
+
+def _ensure_xvfb():
+    """Start Xvfb on :99 if no display is set (VPS mode)."""
+    if os.environ.get("DISPLAY"):
+        return
+    try:
+        subprocess.Popen(
+            ["Xvfb", ":99", "-screen", "0", "1280x800x24", "-ac"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        time.sleep(1)
+        os.environ["DISPLAY"] = ":99"
+    except FileNotFoundError:
+        pass  # Xvfb not installed — Chrome may still work
+
+
+def init_wa_driver():
+    """Open WhatsApp Web with persistent profile. Returns driver or None if not logged in."""
+    _ensure_xvfb()
+    options = Options()
+    options.add_argument(f"--user-data-dir={_WHATSAPP_PROFILE}")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--window-size=1280,800")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
+    driver = webdriver.Chrome(
+        service=Service(ChromeDriverManager().install()),
+        options=options,
+    )
+    driver.get("https://web.whatsapp.com")
+    print("[WA] Loading WhatsApp Web...")
+    for _ in range(30):
+        time.sleep(1)
+        # QR shown = not logged in
+        if driver.find_elements(By.CSS_SELECTOR, "canvas[aria-label='Scan me!'], div[data-testid='qrcode'] canvas"):
+            print("[WA ERROR] Not logged in — run: python3 setup_whatsapp.py")
+            driver.quit()
+            return None
+        # Chat list visible = logged in
+        if driver.find_elements(By.CSS_SELECTOR, "div[data-testid='chat-list'], div[aria-label='Chat list'], #side"):
+            print("[WA] Logged in OK")
+            return driver
+    print("[WA ERROR] WhatsApp Web failed to load")
+    driver.quit()
+    return None
 
 
 def get_driver():
@@ -243,19 +295,29 @@ def scrape_google_maps(query: str, max_results: int = 20) -> list:
     return businesses
 
 
-def send_whatsapp_message(phone: str, message: str, delay: int = 15):
-    """Send a WhatsApp message via WhatsApp Web (requires WhatsApp Web open & logged in)."""
+def send_whatsapp_message(driver, phone: str, message: str) -> bool:
+    """Send a WhatsApp message via WhatsApp Web using a persistent Selenium session."""
     try:
-        pywhatkit.sendwhatmsg_instantly(
-            phone_no=phone,
-            message=message,
-            wait_time=delay,
-            tab_close=True,
-            close_time=3,
-        )
+        url = f"https://web.whatsapp.com/send?phone={phone}&text={quote(message)}"
+        driver.get(url)
+        # Wait for send button (WhatsApp Web pre-fills the message)
+        send_btn = None
+        for sel in ['button[data-testid="send"]', 'span[data-icon="send"]']:
+            try:
+                send_btn = WebDriverWait(driver, 20).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, sel))
+                )
+                break
+            except Exception:
+                pass
+        if send_btn is None:
+            print(f"[WA ERROR] Send button not found for {phone}")
+            return False
+        send_btn.click()
+        time.sleep(2)
         return True
     except Exception as e:
-        print(f"[WA ERROR] {phone}: {e}")
+        print(f"[WA ERROR] {phone}: {str(e).splitlines()[0]}")
         return False
 
 
@@ -341,48 +403,61 @@ def run_outreach(cities_override: list = None):
     email_template = load_template(language, channel="email")
     wa_template = load_template(language, channel="whatsapp") if enable_whatsapp else None
 
+    # Init one WhatsApp driver for the whole session (avoids reopening Chrome per message)
+    wa_driver = None
+    if enable_whatsapp:
+        wa_driver = init_wa_driver()
+        if wa_driver is None:
+            enable_whatsapp = False
+
     total_emails = 0
     total_wa = 0
 
-    for niche in niches:
-        print(f"\n[SEARCH] {niche}")
-        businesses = scrape_google_maps(niche, max_results=max_results_per_niche)
+    try:
+        for niche in niches:
+            print(f"\n[SEARCH] {niche}")
+            businesses = scrape_google_maps(niche, max_results=max_results_per_niche)
 
-        for biz in businesses:
-            company_name = biz.get("name", "")
-            website = biz.get("website", "")
-            phone = biz.get("phone", "")
+            for biz in businesses:
+                company_name = biz.get("name", "")
+                website = biz.get("website", "")
+                phone = biz.get("phone", "")
 
-            # --- Email ---
-            email = ""
-            if website and website.startswith("http"):
-                email = extract_email_from_website(website)
+                # --- Email ---
+                email = ""
+                if website and website.startswith("http"):
+                    email = extract_email_from_website(website)
 
-            if email and "@" in email and email not in already_emailed:
-                body = fill_template(email_template, company_name, config)
-                try:
-                    yag.send(to=email, subject=subject, contents=body)
-                    print(f"[EMAIL SENT] {company_name} <{email}>")
-                    already_emailed.add(email)
-                    _log("email", company_name, email, phone, niche, website)
-                    total_emails += 1
-                    time.sleep(delay)
-                except Exception as e:
-                    print(f"[EMAIL ERROR] {email}: {e}")
-            else:
-                if not email:
-                    print(f"[SKIP EMAIL] No email: {company_name}")
+                if email and "@" in email and email not in already_emailed:
+                    body = fill_template(email_template, company_name, config)
+                    try:
+                        yag.send(to=email, subject=subject, contents=body)
+                        print(f"[EMAIL SENT] {company_name} <{email}>")
+                        already_emailed.add(email)
+                        _log("email", company_name, email, phone, niche, website)
+                        total_emails += 1
+                        time.sleep(delay)
+                    except Exception as e:
+                        print(f"[EMAIL ERROR] {email}: {e}")
+                else:
+                    if not email:
+                        print(f"[SKIP EMAIL] No email: {company_name}")
 
-            # --- WhatsApp ---
-            if enable_whatsapp and phone and phone not in already_whatsapped:
-                wa_body = fill_template(wa_template, company_name, config)
-                if send_whatsapp_message(phone, wa_body, delay=whatsapp_delay):
-                    print(f"[WA SENT] {company_name} <{phone}>")
-                    already_whatsapped.add(phone)
-                    _log("whatsapp", company_name, "", phone, niche, website)
-                    total_wa += 1
-            elif enable_whatsapp and not phone:
-                print(f"[SKIP WA] No phone: {company_name}")
+                # --- WhatsApp ---
+                if enable_whatsapp and wa_driver and phone and phone not in already_whatsapped:
+                    wa_body = fill_template(wa_template, company_name, config)
+                    if send_whatsapp_message(wa_driver, phone, wa_body):
+                        print(f"[WA SENT] {company_name} <{phone}>")
+                        already_whatsapped.add(phone)
+                        _log("whatsapp", company_name, "", phone, niche, website)
+                        total_wa += 1
+                        time.sleep(whatsapp_delay)
+                elif enable_whatsapp and not phone:
+                    print(f"[SKIP WA] No phone: {company_name}")
+
+    finally:
+        if wa_driver:
+            wa_driver.quit()
 
     print(f"\n[DONE] Emails sent: {total_emails} | WhatsApp sent: {total_wa}")
     print(f"[LOG] Saved to: {os.path.abspath(LOG_FILE)}")
