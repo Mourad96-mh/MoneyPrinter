@@ -306,23 +306,69 @@ def scrape_google_maps(query: str, max_results: int = 20) -> list:
 
 def send_whatsapp_message(driver, phone: str, message: str) -> bool:
     """Send a WhatsApp message via WhatsApp Web using a persistent Selenium session."""
+    from selenium.webdriver.common.keys import Keys
     try:
         phone_digits = phone.lstrip("+")
         url = f"https://web.whatsapp.com/send?phone={phone_digits}&text={quote(message)}"
         driver.get(url)
-        # Wait for send button (WhatsApp Web pre-fills the message)
-        send_btn = None
-        for sel in ['button[data-testid="send"]', 'span[data-icon="send"]']:
+        time.sleep(3)
+
+        # Dismiss "Continue to chat" popup if it appears
+        for popup_sel in [
+            'a[href*="open?phone"]',
+            'div[data-testid="popup-contents"] button',
+            'button[data-testid="popup-btn-ok"]',
+        ]:
             try:
-                send_btn = WebDriverWait(driver, 20).until(
+                btn = WebDriverWait(driver, 5).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, popup_sel))
+                )
+                btn.click()
+                time.sleep(2)
+                break
+            except Exception:
+                pass
+
+        # Check for invalid phone error
+        if driver.find_elements(By.XPATH, "//*[contains(text(),'numéro de téléphone') or contains(text(),'phone number') or contains(text(),'invalid')]"):
+            print(f"[WA ERROR] Invalid/not on WhatsApp: {phone}")
+            return False
+
+        # Wait for send button — try multiple selectors
+        send_btn = None
+        for sel in [
+            'button[data-testid="send"]',
+            'span[data-icon="send"]',
+            'button[aria-label="Envoyer"]',
+            'button[aria-label="Send"]',
+            '[data-testid="compose-btn-send"]',
+        ]:
+            try:
+                send_btn = WebDriverWait(driver, 15).until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, sel))
                 )
                 break
             except Exception:
                 pass
+
+        # Fallback: press Enter in the message input box
         if send_btn is None:
+            for input_sel in [
+                'div[data-testid="conversation-compose-box-input"]',
+                'div[contenteditable="true"][data-tab="10"]',
+                'footer div[contenteditable="true"]',
+            ]:
+                try:
+                    input_box = driver.find_element(By.CSS_SELECTOR, input_sel)
+                    input_box.send_keys(Keys.ENTER)
+                    time.sleep(2)
+                    print(f"[WA SENT via Enter] {phone}")
+                    return True
+                except Exception:
+                    pass
             print(f"[WA ERROR] Send button not found for {phone}")
             return False
+
         send_btn.click()
         time.sleep(2)
         return True
