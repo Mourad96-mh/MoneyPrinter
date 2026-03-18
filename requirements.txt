@@ -1,0 +1,4 @@
+yagmail
+requests
+selenium
+webdriver-manager

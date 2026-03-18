@@ -1,0 +1,9 @@
+Bonjour {{COMPANY_NAME}} 👋
+
+Je suis {{SENDER_NAME}}, agence web à Casablanca.
+
+J'ai remarqué que votre entreprise n'a pas encore de site web professionnel. Je peux vous en créer un en 7 jours à partir de 1 500 DH — moderne, rapide et visible sur Google.
+
+Intéressé(e) ? Répondez à ce message 😊
+📞 {{AGENCY_PHONE}}
+🌐 {{AGENCY_WEBSITE}}

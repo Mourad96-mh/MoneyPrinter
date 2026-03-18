@@ -1,0 +1,13 @@
+config.json
+*.csv
+niche.txt
+google-maps-scraper*/
+google-maps-scraper.exe
+google-maps-scraper
+__pycache__/
+*.pyc
+.env
+logs/
+gmail.txt
+terminal.txt
+*.log
