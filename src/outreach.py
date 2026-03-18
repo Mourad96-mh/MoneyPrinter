@@ -307,7 +307,8 @@ def scrape_google_maps(query: str, max_results: int = 20) -> list:
 def send_whatsapp_message(driver, phone: str, message: str) -> bool:
     """Send a WhatsApp message via WhatsApp Web using a persistent Selenium session."""
     try:
-        url = f"https://web.whatsapp.com/send?phone={phone}&text={quote(message)}"
+        phone_digits = phone.lstrip("+")
+        url = f"https://web.whatsapp.com/send?phone={phone_digits}&text={quote(message)}"
         driver.get(url)
         # Wait for send button (WhatsApp Web pre-fills the message)
         send_btn = None
