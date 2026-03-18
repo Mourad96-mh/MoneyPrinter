@@ -192,12 +192,18 @@ def scrape_google_maps(query: str, max_results: int = 20) -> list:
     businesses = []
 
     try:
-        url = f"https://www.google.com/maps/search/{quote(query)}"
+        url = f"https://www.google.com/maps/search/{quote(query)}?hl=fr&gl=ma"
         driver.get(url)
         time.sleep(5)
 
         accept_cookies(driver)
         time.sleep(2)
+
+        # Save debug screenshot for first query
+        try:
+            driver.save_screenshot("/tmp/maps_debug.png")
+        except Exception:
+            pass
 
         # Scroll the results panel to load more listings
         try:
