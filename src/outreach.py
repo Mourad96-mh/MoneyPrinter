@@ -311,60 +311,34 @@ def send_whatsapp_message(driver, phone: str, message: str) -> bool:
         phone_digits = phone.lstrip("+")
         url = f"https://web.whatsapp.com/send?phone={phone_digits}&text={quote(message)}"
         driver.get(url)
-        time.sleep(3)
 
-        # Dismiss "Continue to chat" popup if it appears
-        for popup_sel in [
-            'a[href*="open?phone"]',
-            'div[data-testid="popup-contents"] button',
-            'button[data-testid="popup-btn-ok"]',
+        # Wait for the message input box to appear (new contacts take longer)
+        input_box = None
+        for input_sel in [
+            'div[data-testid="conversation-compose-box-input"]',
+            'div[contenteditable="true"][data-tab="10"]',
+            'div[contenteditable="true"][data-tab="6"]',
+            'div[contenteditable="true"][aria-label="Type a message"]',
+            'div[contenteditable="true"][aria-label="Tapez un message"]',
+            'footer div[contenteditable="true"]',
+            'div[contenteditable="true"]',
         ]:
             try:
-                btn = WebDriverWait(driver, 5).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, popup_sel))
-                )
-                btn.click()
-                time.sleep(2)
-                break
-            except Exception:
-                pass
-
-        # Wait for send button — try multiple selectors
-        send_btn = None
-        for sel in [
-            'button[data-testid="send"]',
-            'span[data-icon="send"]',
-            'button[aria-label="Envoyer"]',
-            'button[aria-label="Send"]',
-            '[data-testid="compose-btn-send"]',
-        ]:
-            try:
-                send_btn = WebDriverWait(driver, 15).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, sel))
+                input_box = WebDriverWait(driver, 20).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, input_sel))
                 )
                 break
             except Exception:
                 pass
 
-        # Fallback: press Enter in the message input box
-        if send_btn is None:
-            for input_sel in [
-                'div[data-testid="conversation-compose-box-input"]',
-                'div[contenteditable="true"][data-tab="10"]',
-                'footer div[contenteditable="true"]',
-            ]:
-                try:
-                    input_box = driver.find_element(By.CSS_SELECTOR, input_sel)
-                    input_box.send_keys(Keys.ENTER)
-                    time.sleep(2)
-                    print(f"[WA SENT via Enter] {phone}")
-                    return True
-                except Exception:
-                    pass
-            print(f"[WA ERROR] Send button not found for {phone}")
+        if input_box is None:
+            print(f"[WA ERROR] Message box not found for {phone}")
             return False
 
-        send_btn.click()
+        # Click to focus then send with Enter
+        input_box.click()
+        time.sleep(1)
+        input_box.send_keys(Keys.ENTER)
         time.sleep(2)
         return True
     except Exception as e:
