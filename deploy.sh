@@ -21,7 +21,7 @@ rm google-chrome-stable_current_amd64.deb
 
 # 2. Python dependencies
 echo "[3/5] Installing Python packages..."
-pip3 install -q --break-system-packages yagmail requests selenium webdriver-manager premailer
+pip3 install -q --break-system-packages --ignore-installed yagmail requests selenium webdriver-manager premailer
 
 # 3. Project setup
 echo "[4/5] Setting up project..."
