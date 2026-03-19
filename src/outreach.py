@@ -117,7 +117,7 @@ def normalize_phone(raw: str) -> str:
     return digits
 
 
-_WHATSAPP_PROFILE = os.path.expanduser("~/.config/chrome-whatsapp")
+_WHATSAPP_PROFILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "chrome_profile")
 
 
 def _ensure_xvfb():
