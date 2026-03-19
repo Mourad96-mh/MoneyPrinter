@@ -15,9 +15,17 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+import shutil
 
-_WHATSAPP_PROFILE = os.path.expanduser("~/.config/chrome-whatsapp")
+_WHATSAPP_PROFILE = os.path.join(os.path.dirname(__file__), "chrome_profile")
+
+
+def _get_chromedriver_path():
+    system_path = shutil.which("chromedriver")
+    if system_path:
+        return system_path
+    from webdriver_manager.chrome import ChromeDriverManager
+    return ChromeDriverManager().install()
 _QR_SCREENSHOT = "/tmp/whatsapp_qr.png"
 
 
@@ -43,7 +51,7 @@ def main():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1280,800")
     driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
+        service=Service(_get_chromedriver_path()),
         options=options,
     )
     driver.get("https://web.whatsapp.com")
