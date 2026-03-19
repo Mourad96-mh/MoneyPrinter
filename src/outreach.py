@@ -22,7 +22,21 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+import shutil
+try:
+    from webdriver_manager.chrome import ChromeDriverManager
+    _WDM_AVAILABLE = True
+except ImportError:
+    _WDM_AVAILABLE = False
+
+def _get_chromedriver_path():
+    """Use system chromedriver if available, otherwise fall back to webdriver_manager."""
+    system_path = shutil.which("chromedriver")
+    if system_path:
+        return system_path
+    if _WDM_AVAILABLE:
+        return ChromeDriverManager().install()
+    raise RuntimeError("No chromedriver found")
 
 
 def load_config():
@@ -134,7 +148,7 @@ def init_wa_driver():
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
     driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
+        service=Service(_get_chromedriver_path()),
         options=options,
     )
     driver.get("https://web.whatsapp.com")
@@ -169,7 +183,7 @@ def get_driver():
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
     driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
+        service=Service(_get_chromedriver_path()),
         options=options,
     )
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
