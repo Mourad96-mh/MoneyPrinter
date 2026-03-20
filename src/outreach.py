@@ -230,11 +230,20 @@ def scrape_google_maps(query: str, max_results: int = 20) -> list:
         except Exception:
             pass
 
-        # Collect all result links
-        result_links = driver.find_elements(By.CSS_SELECTOR, 'div[role="feed"] a[href*="/maps/place/"]')
-        result_links = result_links[:max_results]
+        # Collect all result links (deduplicated by href to avoid feed duplicates)
+        all_links = driver.find_elements(By.CSS_SELECTOR, 'div[role="feed"] a[href*="/maps/place/"]')
+        seen_hrefs = set()
+        result_links = []
+        for lnk in all_links:
+            href = lnk.get_attribute("href") or ""
+            if href not in seen_hrefs:
+                seen_hrefs.add(href)
+                result_links.append(lnk)
+            if len(result_links) >= max_results:
+                break
         print(f"[INFO] Found {len(result_links)} listings for: {query}")
 
+        seen_names = set()
         for i, link in enumerate(result_links):
             try:
                 driver.execute_script("arguments[0].click();", link)
@@ -262,6 +271,13 @@ def scrape_google_maps(query: str, max_results: int = 20) -> list:
                 if not name:
                     continue
 
+                # Skip duplicate business names within this query
+                name_key = name.lower().strip()
+                if name_key in seen_names:
+                    print(f"  [DUP] Skipping duplicate: {name}")
+                    continue
+                seen_names.add(name_key)
+
                 # Get website
                 website = ""
                 try:
@@ -285,29 +301,15 @@ def scrape_google_maps(query: str, max_results: int = 20) -> list:
             except Exception as e:
                 err_msg = str(e).splitlines()[0]  # first line only, no giant stacktrace
                 print(f"  [SKIP] Listing {i+1}: {err_msg}")
-                # If the session is dead, restart the driver and re-navigate
+                # If the session is dead, stop scraping this niche (can't safely resume mid-loop)
                 if "invalid session id" in str(e).lower():
-                    print(f"  [RECOVER] Session died — restarting driver at listing {i+1}")
+                    print(f"  [RECOVER] Session died at listing {i+1} — stopping this niche")
                     try:
                         driver.quit()
                     except Exception:
                         pass
                     driver = get_driver()
-                    driver.get(url)
-                    time.sleep(3)
-                    accept_cookies(driver)
-                    time.sleep(1)
-                    try:
-                        feed = WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, 'div[role="feed"]'))
-                        )
-                        for _ in range(5):
-                            driver.execute_script("arguments[0].scrollTop = arguments[0].scrollHeight", feed)
-                            time.sleep(1.5)
-                    except Exception:
-                        pass
-                    result_links = driver.find_elements(By.CSS_SELECTOR, 'div[role="feed"] a[href*="/maps/place/"]')
-                    result_links = result_links[:max_results]
+                    break
                 continue
 
     except Exception as e:
